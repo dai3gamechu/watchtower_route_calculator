@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>
+    見張り台 必要数計算ツール
+  </title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header class="hero">
+<div class="hero-content">
+
+    <p class="hero-game">
+    DOOMSDAY : LAST SURVIVORS
+    </p>
+
+    <h1>
+    見張り台 必要数計算ツール
+    </h1>
+
+    <p class="hero-description">
+    座標情報をもとに、目的地までに必要な見張り台の最小数を計算します。<br>
+    あわせて、建設のポイントや推奨建築座標を表示します。
+    </p>
+
+</div>
+</header>
+
+  <div>
+    <h2>
+      スタート地点
+    </h2>
+
+    <label>
+      X：
+      <input
+        type="number"
+        id="startX"
+        placeholder="例：577"
+      >
+    </label>
+
+    <label>
+      Y：
+      <input
+        type="number"
+        id="startY"
+        placeholder="例：598"
+      >
+    </label>
+  </div>
+
+
+  <div>
+    <h2>
+      目的地
+    </h2>
+
+    <label>
+      X：
+      <input
+        type="number"
+        id="destinationX"
+        placeholder="例：547"
+      >
+    </label>
+
+    <label>
+      Y：
+      <input
+        type="number"
+        id="destinationY"
+        placeholder="例：622"
+      >
+    </label>
+  </div>
+
+
+  <div>
+    <button
+      id="calculateButton"
+    >
+      計算する
+    </button>
+  </div>
+
+
+  <hr>
+
+
+  <div
+    id="resultArea"
+  >
+  </div>
+
+
+  <script
+    src="watchtower-calculator.js"
+  ></script>
+
+
+  <script>
+    (() => {
+      "use strict";
+
+
+      const startXInput =
+        document.getElementById(
+          "startX"
+        );
+
+      const startYInput =
+        document.getElementById(
+          "startY"
+        );
+
+      const destinationXInput =
+        document.getElementById(
+          "destinationX"
+        );
+
+      const destinationYInput =
+        document.getElementById(
+          "destinationY"
+        );
+
+      const calculateButton =
+        document.getElementById(
+          "calculateButton"
+        );
+
+      const resultArea =
+        document.getElementById(
+          "resultArea"
+        );
+
+
+      function escapeHtml(
+        value
+      ) {
+        return String(value)
+          .replaceAll(
+            "&",
+            "&amp;"
+          )
+          .replaceAll(
+            "<",
+            "&lt;"
+          )
+          .replaceAll(
+            ">",
+            "&gt;"
+          )
+          .replaceAll(
+            '"',
+            "&quot;"
+          )
+          .replaceAll(
+            "'",
+            "&#039;"
+          );
+      }
+
+
+      function formatGuidanceText(text) {
+        return escapeHtml(text)
+            .replaceAll("【強調】", "<strong>")
+            .replaceAll("【/強調】", "</strong>");
+      }
+      
+
+      function getInputValues() {
+        return {
+          startX:
+            Number(
+              startXInput.value
+            ),
+
+          startY:
+            Number(
+              startYInput.value
+            ),
+
+          destinationX:
+            Number(
+              destinationXInput.value
+            ),
+
+          destinationY:
+            Number(
+              destinationYInput.value
+            ),
+        };
+      }
+
+
+      function hasEmptyInput() {
+        return (
+          startXInput.value === "" ||
+          startYInput.value === "" ||
+          destinationXInput.value === "" ||
+          destinationYInput.value === ""
+        );
+      }
+
+
+      function showError(
+        message
+      ) {
+        resultArea.innerHTML = `
+          <section>
+            <p>
+              ${escapeHtml(
+                message
+              )}
+            </p>
+          </section>
+        `;
+      }
+
+
+      function buildDistanceText(
+        dx,
+        dy
+      ) {
+        const parts = [];
+
+        if (
+          dx > 0
+        ) {
+          parts.push(
+            `右${dx}マス`
+          );
+        }
+
+        if (
+          dx < 0
+        ) {
+          parts.push(
+            `左${Math.abs(dx)}マス`
+          );
+        }
+
+        if (
+          dy > 0
+        ) {
+          parts.push(
+            `上${dy}マス`
+          );
+        }
+
+        if (
+          dy < 0
+        ) {
+          parts.push(
+            `下${Math.abs(dy)}マス`
+          );
+        }
+
+        if (
+          parts.length === 0
+        ) {
+          return "同じマス";
+        }
+
+        return parts.join("・");
+      }
+
+
+      function showResult(
+        result
+      ) {
+        let html = "";
+
+
+        html += `
+          <section>
+            <h2>
+              必要な見張り台：
+              <strong>
+                ${result.count}個
+              </strong>
+            </h2>
+          </section>
+        `;
+
+
+        html += `
+          <section>
+            <h3>
+              目的地までの距離
+            </h3>
+
+            <p>
+              ${escapeHtml(
+                buildDistanceText(
+                  result.dx,
+                  result.dy
+                )
+              )}
+            </p>
+          </section>
+        `;
+
+
+        if (
+          result.guidance &&
+          result.guidance.length > 0
+        ) {
+          html += `
+            <section>
+              <h3>
+                建設のポイント
+              </h3>
+
+              <ul>
+          `;
+
+          for (
+            const note
+            of result.guidance
+          ) {
+            html += `
+              <li>
+                ${formatGuidanceText(
+                  note
+                )}
+              </li>
+            `;
+          }
+
+          html += `
+              </ul>
+            </section>
+          `;
+        }
+
+
+        if (
+          result.routeCoordinates &&
+          result.routeCoordinates.length > 0
+        ) {
+          html += `
+            <section>
+              <h3>
+                推奨建築座標
+              </h3>
+
+              <ol>
+          `;
+
+          for (
+            const tower
+            of result.routeCoordinates
+          ) {
+            html += `
+              <li>
+                X${tower.x}
+                /
+                Y${tower.y}
+              </li>
+            `;
+          }
+
+          html += `
+              </ol>
+            </section>
+          `;
+        }
+
+
+        // 注意書き
+        html += `
+          <aside class="result-note">
+            <p>
+              ※この結果は、座標をもとに机上で計算したものです。
+              マップ内の障害物は考慮していないため、
+              実際には推奨ルートで建設できない場合があります。
+              あらかじめご了承ください。
+            </p>
+          </aside>
+        `;
+
+
+        resultArea.innerHTML =
+          html;
+      }
+
+
+      function calculate() {
+        if (
+          hasEmptyInput()
+        ) {
+          showError(
+            "スタート地点と目的地のX・Y座標をすべて入力してください。"
+          );
+
+          return;
+        }
+
+
+        const {
+          startX,
+          startY,
+          destinationX,
+          destinationY,
+        } =
+          getInputValues();
+
+
+        if (
+          !Number.isFinite(startX) ||
+          !Number.isFinite(startY) ||
+          !Number.isFinite(destinationX) ||
+          !Number.isFinite(destinationY)
+        ) {
+          showError(
+            "座標には数値を入力してください。"
+          );
+
+          return;
+        }
+
+
+        try {
+          const result =
+            WatchtowerCalculator.calculate(
+              startX,
+              startY,
+              destinationX,
+              destinationY
+            );
+
+
+          if (
+            result.status ===
+            "already_connected"
+          ) {
+            resultArea.innerHTML = `
+              <section>
+                <h2>
+                  確認してください
+                </h2>
+
+                <p>
+                  ${escapeHtml(
+                    result.message
+                  )}
+                </p>
+              </section>
+            `;
+
+            return;
+          }
+
+
+          showResult(
+            result
+          );
+
+        } catch (
+          error
+        ) {
+          console.error(
+            error
+          );
+
+          showError(
+            "計算中にエラーが発生しました。"
+          );
+        }
+      }
+
+
+      calculateButton.addEventListener(
+        "click",
+        calculate
+      );
+
+
+      const inputs = [
+        startXInput,
+        startYInput,
+        destinationXInput,
+        destinationYInput,
+      ];
+
+
+      for (
+        const input
+        of inputs
+      ) {
+        input.addEventListener(
+          "keydown",
+          (
+            event
+          ) => {
+            if (
+              event.key ===
+              "Enter"
+            ) {
+              calculate();
+            }
+          }
+        );
+      }
+
+    })();
+  </script>
+
+</body>
+</html>

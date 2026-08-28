@@ -1,0 +1,573 @@
+/* ========================================
+   見張り台 必要数計算ツール
+   ======================================== */
+
+
+/* ---------- 基本設定 ---------- */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 24px 16px 48px;
+
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "Hiragino Kaku Gothic ProN",
+    "Hiragino Sans",
+    "Yu Gothic",
+    Meiryo,
+    sans-serif;
+
+  color: #222;
+
+  background-image:
+    linear-gradient(
+      rgba(0, 0, 0, 0.22),
+      rgba(0, 0, 0, 0.22)
+    ),
+    url("gazou.png");
+
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+
+/* ========================================
+   ヘッダー
+   ======================================== */
+
+.hero {
+  width: min(100%, 900px);
+
+  margin:
+    0
+    auto
+    24px;
+
+  padding:
+    30px
+    20px
+    20px;
+
+  color: #fff;
+
+  text-align: center;
+
+  background: transparent;
+
+  box-shadow: none;
+}
+
+
+.hero-content {
+  width: min(100%, 760px);
+
+  margin: 0 auto;
+}
+
+
+.hero-game {
+  margin:
+    0
+    0
+    12px;
+
+  font-size: 13px;
+  font-weight: 800;
+
+  letter-spacing: 2px;
+}
+
+
+.hero h1 {
+  width: auto;
+
+  margin:
+    0
+    0
+    14px;
+
+  padding: 0;
+
+  font-size: 34px;
+  line-height: 1.35;
+
+  color: #fff;
+
+  background: none;
+
+  border-radius: 0;
+
+  box-shadow: none;
+
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+
+.hero-description {
+  margin: 0;
+
+  font-size: 15px;
+  line-height: 1.9;
+
+  color:
+    rgba(255, 255, 255, 0.94);
+
+  text-shadow:
+    0 1px 5px rgba(0, 0, 0, 0.6);
+}
+
+
+/* ---------- 入力エリア ---------- */
+
+body > div:not(#resultArea) {
+  width: min(100%, 620px);
+  margin: 0 auto 14px;
+
+  padding: 18px;
+
+  background: rgba(255, 255, 255, 0.94);
+
+  border-radius: 14px;
+
+  box-shadow:
+    0 5px 18px rgba(0, 0, 0, 0.22);
+}
+
+
+/* ---------- 入力エリア見出し ---------- */
+
+body > div:not(#resultArea) h2 {
+  margin: 0 0 14px;
+
+  font-size: 19px;
+
+  color: #273746;
+
+  border-left: 5px solid #6b8eaa;
+
+  padding-left: 10px;
+}
+
+
+/* ---------- 入力欄 ---------- */
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-top: 10px;
+
+  font-size: 16px;
+  font-weight: 600;
+}
+
+input[type="number"] {
+  width: 100%;
+
+  padding: 12px 14px;
+
+  font-size: 18px;
+
+  color: #222;
+
+  background: #fff;
+
+  border: 1px solid #b9c1c8;
+  border-radius: 9px;
+
+  outline: none;
+
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+input[type="number"]:focus {
+  border-color: #557c9c;
+
+  box-shadow:
+    0 0 0 3px rgba(85, 124, 156, 0.18);
+}
+
+
+/* ---------- 計算ボタン ---------- */
+
+button {
+  width: 100%;
+
+  padding: 14px 20px;
+
+  font-size: 18px;
+  font-weight: 700;
+
+  color: #fff;
+
+  background: #426b8a;
+
+  border: none;
+  border-radius: 10px;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.16);
+
+  transition:
+    background 0.2s,
+    transform 0.1s,
+    box-shadow 0.2s;
+}
+
+button:hover {
+  background: #365d79;
+}
+
+button:active {
+  transform: translateY(1px);
+
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.18);
+}
+
+
+/* ---------- 区切り線 ---------- */
+
+hr {
+  width: min(100%, 620px);
+
+  margin: 22px auto;
+
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+
+/* ========================================
+   計算結果
+   ======================================== */
+
+#resultArea {
+  width: min(100%, 620px);
+
+  margin: 0 auto;
+}
+
+
+/* ---------- 各結果ブロック ---------- */
+
+#resultArea section,
+#resultArea .result-note {
+  margin-bottom: 14px;
+
+  padding: 18px;
+
+  background: rgba(255, 255, 255, 0.95);
+
+  border-radius: 14px;
+
+  box-shadow:
+    0 5px 18px rgba(0, 0, 0, 0.22);
+}
+
+
+/* ---------- 必要な見張り台 ---------- */
+
+#resultArea section:first-child {
+  text-align: center;
+
+  background: rgba(238, 247, 252, 0.97);
+
+  border: 2px solid #6b93ad;
+}
+
+#resultArea section:first-child h2 {
+  margin: 0;
+
+  font-size: 20px;
+
+  color: #314b5c;
+}
+
+#resultArea section:first-child strong {
+  display: inline-block;
+
+  margin-left: 4px;
+
+  font-size: 32px;
+
+  color: #255f85;
+}
+
+
+/* ---------- 結果見出し ---------- */
+
+#resultArea h3 {
+  margin: 0 0 12px;
+
+  padding-bottom: 7px;
+
+  font-size: 18px;
+
+  color: #273746;
+
+  border-bottom: 1px solid #d2d8dd;
+}
+
+
+/* ---------- 結果本文 ---------- */
+
+#resultArea p {
+  margin: 0;
+
+  line-height: 1.75;
+}
+
+
+/* ---------- 建設のポイント ---------- */
+
+#resultArea ul {
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+#resultArea ul li {
+  margin-bottom: 9px;
+
+  line-height: 1.65;
+}
+
+#resultArea ul li strong {
+  font-weight: 700;
+  color: #244f6b;
+}
+
+#resultArea ul li:last-child {
+  margin-bottom: 0;
+}
+
+
+/* ---------- 推奨建築座標 ---------- */
+
+#resultArea ol {
+  margin: 0;
+
+  padding-left: 0;
+
+  list-style: none;
+
+  counter-reset: tower-number;
+}
+
+#resultArea ol li {
+  counter-increment: tower-number;
+
+  margin-bottom: 8px;
+
+  padding: 11px 12px;
+
+  font-size: 17px;
+  font-weight: 700;
+
+  background: #f2f6f8;
+
+  border-left: 4px solid #6689a1;
+
+  border-radius: 7px;
+}
+
+#resultArea ol li::before {
+  content: counter(tower-number) "．";
+
+  margin-right: 6px;
+
+  color: #557a94;
+}
+
+#resultArea ol li:last-child {
+  margin-bottom: 0;
+}
+
+
+/* ---------- 注意書き ---------- */
+
+#resultArea .result-note {
+  padding: 14px 16px;
+
+  font-size: 13px;
+
+  color: #555;
+
+  background: rgba(255, 250, 235, 0.96);
+
+  border-left: 5px solid #d3a84b;
+}
+
+#resultArea .result-note p {
+  line-height: 1.65;
+}
+
+
+/* ========================================
+   スマートフォン
+   ======================================== */
+
+@media (max-width: 600px) {
+
+  body {
+    padding:
+      14px
+      10px
+      32px;
+
+    background-attachment: scroll;
+  }
+
+
+  h1 {
+    margin-bottom: 14px;
+
+    padding: 14px 10px;
+
+    font-size: 21px;
+
+    border-radius: 11px;
+  }
+
+
+  body > div:not(#resultArea) {
+    margin-bottom: 11px;
+
+    padding: 15px;
+
+    border-radius: 11px;
+  }
+
+
+  body > div:not(#resultArea) h2 {
+    margin-bottom: 10px;
+
+    font-size: 17px;
+  }
+
+
+  label {
+    margin-top: 8px;
+
+    font-size: 15px;
+  }
+
+
+  input[type="number"] {
+    padding: 12px;
+
+    font-size: 18px;
+  }
+
+
+  button {
+    padding: 14px;
+
+    font-size: 17px;
+  }
+
+
+  hr {
+    margin:
+      16px
+      auto;
+  }
+
+
+  #resultArea section,
+  #resultArea .result-note {
+    margin-bottom: 11px;
+
+    padding: 15px;
+
+    border-radius: 11px;
+  }
+
+
+  #resultArea section:first-child h2 {
+    font-size: 18px;
+  }
+
+
+  #resultArea section:first-child strong {
+    display: block;
+
+    margin-top: 4px;
+    margin-left: 0;
+
+    font-size: 34px;
+  }
+
+
+  #resultArea h3 {
+    font-size: 17px;
+  }
+
+
+  #resultArea ol li {
+    padding: 11px;
+
+    font-size: 17px;
+  }
+
+
+  #resultArea .result-note {
+    font-size: 12px;
+  }
+
+  .hero {
+  width: 100%;
+
+  margin:
+    0
+    auto
+    14px;
+
+  padding:
+    22px
+    8px
+    16px;
+  }
+  
+  
+  .hero-game {
+  margin-bottom: 9px;
+
+  font-size: 11px;
+
+  letter-spacing: 1.5px;
+  }
+
+
+  .hero h1 {
+  margin-bottom: 12px;
+
+  font-size: 26px;
+  }
+
+
+  .hero-description {
+  font-size: 13px;
+
+  line-height: 1.8;
+  }
+}
