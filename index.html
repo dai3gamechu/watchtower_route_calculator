@@ -35,6 +35,29 @@
 </div>
 </header>
 
+  <div class="map-select-card">
+    <h2>マップ選択</h2>
+
+    <label>
+      <input
+        type="radio"
+        name="mapType"
+        value="region"
+        checked
+      >
+      地域
+    </label>
+
+    <label>
+      <input
+        type="radio"
+        name="mapType"
+        value="ir"
+      >
+      IR
+    </label>
+  </div>
+
   <div>
     <h2>
       スタート地点
@@ -432,14 +455,20 @@
 
 
         try {
+          const selectedMap =
+            document.querySelector(
+              'input[name="mapType"]:checked'
+            ).value;
+
+
           const result =
             WatchtowerCalculator.calculate(
+              selectedMap,
               startX,
               startY,
               destinationX,
               destinationY
             );
-
 
           if (
             result.status ===
