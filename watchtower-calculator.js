@@ -1,58 +1,80 @@
 /**
- * 見張り台 最短ルート計算ロジック
+ * 見張り台 必要数・推奨ルート計算
  *
  * ルール
- * - 1マス = 座標3
- * - 基準境界 X=728 / Y=572
- * - 見張り台1個 = 3×3マス
- * - 新しい見張り台は既存領地と辺で接続する
- * - 角だけの接触は不可
- * - 見張り台同士の重なりは許可
- * - 目的地は、見張り台領地に含まれるか、辺で接すれば到達
- * - 最小個数を最優先し、その中から推奨ルートを1つ選ぶ
+ * --------------------------------------------------
+ * ・1マス = 座標3
+ * ・基準境界 X=728 / Y=572
+ * ・見張り台1個 = 3×3マス
+ * ・新しい見張り台は既存領地と「辺」で接する必要がある
+ * ・角だけの接触は不可
+ * ・見張り台同士の重なりは可
+ * ・目的地は見張り台領地内、または辺で接すれば到達
+ * ・最小個数を最優先
+ * ・同じ最小個数なら、人間が建設しやすいルートを優先
  */
 
 (() => {
   "use strict";
 
+
+  // ==================================================
+  // 基本設定
+  // ==================================================
+
   const GRID_SIZE = 3;
+
   const X_BOUNDARY = 728;
   const Y_BOUNDARY = 572;
 
 
-  // ========================================
-  // 基本処理
-  // ========================================
+  // ==================================================
+  // 共通関数
+  // ==================================================
 
   function sign(value) {
-    return value > 0 ? 1 : value < 0 ? -1 : 0;
+    if (value > 0) {
+      return 1;
+    }
+
+    if (value < 0) {
+      return -1;
+    }
+
+    return 0;
   }
 
 
-  function clamp(value, min, max) {
+  function clamp(
+    value,
+    min,
+    max
+  ) {
     return Math.max(
       min,
-      Math.min(max, value)
+      Math.min(
+        max,
+        value
+      )
     );
   }
 
 
-  /**
-   * 実座標からマス番号を取得
-   */
+  // ==================================================
+  // 座標 → マス
+  // ==================================================
+
   function coordinateToCellIndex(
     value,
     boundary
   ) {
     return Math.floor(
-      (value - boundary) / GRID_SIZE
+      (value - boundary) /
+      GRID_SIZE
     );
   }
 
 
-  /**
-   * マス番号から代表座標を取得
-   */
   function cellIndexToRepresentative(
     index,
     boundary
@@ -65,9 +87,6 @@
   }
 
 
-  /**
-   * 入力座標をマス単位へ変換
-   */
   function normalizePoint(
     x,
     y
@@ -83,6 +102,7 @@
         y,
         Y_BOUNDARY
       );
+
 
     return {
       inputX: x,
@@ -106,9 +126,13 @@
   }
 
 
+  // ==================================================
+  // 到達判定
+  // ==================================================
+
   /**
-   * スタートと目的地が、
-   * すでに同一マスまたは辺で接しているか
+   * スタート地点と目的地が
+   * 同一マス、または既に辺で接しているか
    */
   function isAlreadyConnected(
     dx,
@@ -128,27 +152,39 @@
 
 
   /**
-   * 見張り台が目的地に到達しているか
+   * 見張り台の中心マスから見て、
+   * 目的地マスへ到達しているか
+   *
+   * 3×3内：
+   *   |dx| <= 1
+   *   |dy| <= 1
+   *
+   * 辺接触：
+   *   |dx| = 2, |dy| <= 1
+   *   または
+   *   |dy| = 2, |dx| <= 1
    */
   function towerReachesCell(
-    cx,
-    cy,
+    towerX,
+    towerY,
     targetX,
     targetY
   ) {
     const dx =
       Math.abs(
-        targetX - cx
+        targetX - towerX
       );
 
     const dy =
       Math.abs(
-        targetY - cy
+        targetY - towerY
       );
+
 
     const inside =
       dx <= 1 &&
       dy <= 1;
+
 
     const edgeTouch =
       (
@@ -160,6 +196,7 @@
         dx <= 1
       );
 
+
     return (
       inside ||
       edgeTouch
@@ -167,63 +204,78 @@
   }
 
 
-  // ========================================
+  // ==================================================
   // 建設可能位置
-  // ========================================
+  // ==================================================
 
   /**
-   * 最初の見張り台候補
+   * 最初の見張り台
    *
-   * スタート地点の1マス領地と、
-   * 辺で接する3×3領地のみ
+   * スタート地点は1マスのみを
+   * 所有領地として扱う。
+   *
+   * 見張り台の3×3領地が
+   * スタートマスと辺接触する位置を列挙。
    */
   function getFirstTowerCandidates() {
-    const result = [];
+    const candidates = [];
+
 
     for (
-      let cx = -2;
-      cx <= 2;
-      cx++
+      let x = -2;
+      x <= 2;
+      x++
     ) {
       for (
-        let cy = -2;
-        cy <= 2;
-        cy++
+        let y = -2;
+        y <= 2;
+        y++
       ) {
-        const ax =
-          Math.abs(cx);
+        const absX =
+          Math.abs(x);
 
-        const ay =
-          Math.abs(cy);
+        const absY =
+          Math.abs(y);
 
-        if (
+
+        const touchesByEdge =
           (
-            ax === 2 &&
-            ay <= 1
+            absX === 2 &&
+            absY <= 1
           ) ||
           (
-            ay === 2 &&
-            ax <= 1
-          )
+            absY === 2 &&
+            absX <= 1
+          );
+
+
+        if (
+          touchesByEdge
         ) {
-          result.push({
-            x: cx,
-            y: cy,
+          candidates.push({
+            x,
+            y,
           });
         }
       }
     }
 
-    return result;
+
+    return candidates;
   }
 
 
   /**
-   * 2個目以降の
-   * 見張り台中心の移動候補
+   * 2個目以降の見張り台
+   *
+   * 3×3同士が辺で接する、
+   * または重なる位置。
+   *
+   * ±3,±3 は角接触のみなので除外。
    */
   function getTowerMoveDeltas() {
-    const result = [];
+    const moves = [];
+
 
     for (
       let dx = -3;
@@ -242,68 +294,82 @@
           continue;
         }
 
-        const ax =
+
+        const absX =
           Math.abs(dx);
 
-        const ay =
+        const absY =
           Math.abs(dy);
 
+
+        if (
+          absX > 3 ||
+          absY > 3
+        ) {
+          continue;
+        }
+
+
         /**
-         * ±3, ±3 は角接触のみになるため除外
+         * 角だけの接触は不可
          */
         if (
-          ax <= 3 &&
-          ay <= 3 &&
-          !(
-            ax === 3 &&
-            ay === 3
-          )
+          absX === 3 &&
+          absY === 3
         ) {
-          result.push({
-            x: dx,
-            y: dy,
-          });
+          continue;
         }
+
+
+        moves.push({
+          x: dx,
+          y: dy,
+        });
       }
     }
 
-    return result;
+
+    return moves;
   }
 
 
   const FIRST_TOWER_CANDIDATES =
     getFirstTowerCandidates();
 
+
   const TOWER_MOVE_DELTAS =
     getTowerMoveDeltas();
 
 
-  // ========================================
-  // 推奨ルート選択
-  // ========================================
+  // ==================================================
+  // 推奨ルート用
+  // ==================================================
 
   /**
-   * 主方向を決定
+   * 主方向
    *
-   * 縦横が同距離の場合は
-   * 縦方向を優先
+   * 距離が同じ場合は縦方向優先
    */
   function getMainAxis(
     dx,
     dy
   ) {
-    return (
+    if (
       Math.abs(dy) >=
       Math.abs(dx)
-    )
-      ? "y"
-      : "x";
+    ) {
+      return "y";
+    }
+
+    return "x";
   }
 
 
   /**
-   * 最初の見張り台の
-   * 理想位置
+   * 最初の見張り台の理想位置
+   *
+   * 主方向：2マス
+   * 副方向：最大1マス
    */
   function getIdealFirstMove(
     dx,
@@ -315,11 +381,13 @@
         dy
       );
 
+
     const sx =
       sign(dx);
 
     const sy =
       sign(dy);
+
 
     if (
       mainAxis === "y"
@@ -335,6 +403,7 @@
       };
     }
 
+
     return {
       x:
         sx * 2,
@@ -348,8 +417,10 @@
 
 
   /**
-   * 2個目以降の
-   * 理想移動
+   * 2個目以降の理想移動
+   *
+   * 主方向は3マス進める。
+   * 副方向は目的地との差を見て最大2マス調整。
    */
   function getIdealNextMove(
     currentX,
@@ -357,25 +428,25 @@
     targetX,
     targetY
   ) {
+    const remainingX =
+      targetX -
+      currentX;
+
+    const remainingY =
+      targetY -
+      currentY;
+
+
     const mainAxis =
       getMainAxis(
         targetX,
         targetY
       );
 
-    const sx =
-      sign(targetX);
-
-    const sy =
-      sign(targetY);
 
     if (
       mainAxis === "y"
     ) {
-      const remainingX =
-        targetX -
-        currentX;
-
       return {
         x:
           clamp(
@@ -385,17 +456,14 @@
           ),
 
         y:
-          sy * 3,
+          sign(targetY) * 3,
       };
     }
 
-    const remainingY =
-      targetY -
-      currentY;
 
     return {
       x:
-        sx * 3,
+        sign(targetX) * 3,
 
       y:
         clamp(
@@ -407,6 +475,9 @@
   }
 
 
+  /**
+   * 理想移動との差
+   */
   function movePenalty(
     actualX,
     actualY,
@@ -415,24 +486,34 @@
   ) {
     return (
       Math.abs(
-        actualX - idealX
+        actualX -
+        idealX
       ) +
       Math.abs(
-        actualY - idealY
+        actualY -
+        idealY
       )
     );
   }
 
 
-  // ========================================
+  // ==================================================
   // 最短ルート探索
-  // ========================================
+  // ==================================================
 
   function findShortestRoute(
     targetX,
     targetY
   ) {
+    /**
+     * 探索領域。
+     *
+     * 必要以上に広げると
+     * 計算量が増えるため、
+     * スタートと目的地の周囲だけを見る。
+     */
     const padding = 6;
+
 
     const minX =
       Math.min(
@@ -441,6 +522,7 @@
       ) -
       padding;
 
+
     const maxX =
       Math.max(
         0,
@@ -448,12 +530,14 @@
       ) +
       padding;
 
+
     const minY =
       Math.min(
         0,
         targetY
       ) -
       padding;
+
 
     const maxY =
       Math.max(
@@ -474,9 +558,10 @@
       new Map();
 
 
-    /**
-     * 最初の見張り台候補
-     */
+    // --------------------------------------------------
+    // 1個目
+    // --------------------------------------------------
+
     for (
       const candidate
       of FIRST_TOWER_CANDIDATES
@@ -490,6 +575,7 @@
         continue;
       }
 
+
       const score =
         movePenalty(
           candidate.x,
@@ -498,36 +584,48 @@
           idealFirst.y
         );
 
+
       const key =
         `${candidate.x},${candidate.y}`;
 
-      layer.set(
-        key,
-        {
-          x:
-            candidate.x,
 
-          y:
-            candidate.y,
+      const existing =
+        layer.get(key);
 
-          score,
 
-          path: [
-            {
-              x:
-                candidate.x,
+      if (
+        !existing ||
+        score <
+        existing.score
+      ) {
+        layer.set(
+          key,
+          {
+            x:
+              candidate.x,
 
-              y:
-                candidate.y,
-            },
-          ],
-        }
-      );
+            y:
+              candidate.y,
+
+            score,
+
+            path: [
+              {
+                x:
+                  candidate.x,
+
+                y:
+                  candidate.y,
+              },
+            ],
+          }
+        );
+      }
     }
 
 
     /**
-     * 探索上限
+     * 十分余裕を持った探索上限
      */
     const maxDepth =
       Math.ceil(
@@ -535,12 +633,14 @@
           Math.abs(targetX) +
           Math.abs(targetY)
         ) / 2
-      ) + 20;
+      ) +
+      20;
 
 
-    /**
-     * BFS
-     */
+    // --------------------------------------------------
+    // BFS
+    // --------------------------------------------------
+
     for (
       let depth = 1;
       depth <= maxDepth;
@@ -550,8 +650,8 @@
 
 
       /**
-       * この深さで目的地へ
-       * 到達している候補を探す
+       * 現在の個数で
+       * 目的地に届いているか
        */
       for (
         const node
@@ -565,15 +665,14 @@
             targetY
           )
         ) {
-          reached.push(
-            node
-          );
+          reached.push(node);
         }
       }
 
 
       /**
-       * 最短ルート発見
+       * このdepthで到達したなら
+       * これが最小個数。
        */
       if (
         reached.length > 0
@@ -583,6 +682,7 @@
             a.score -
             b.score
         );
+
 
         return {
           count:
@@ -597,12 +697,13 @@
       }
 
 
-      /**
-       * 次の深さへ
-       */
       const nextLayer =
         new Map();
 
+
+      // ------------------------------------------------
+      // 次の見張り台を展開
+      // ------------------------------------------------
 
       for (
         const node
@@ -624,6 +725,7 @@
           const nextX =
             node.x +
             delta.x;
+
 
           const nextY =
             node.y +
@@ -653,16 +755,15 @@
           const key =
             `${nextX},${nextY}`;
 
+
           const existing =
-            nextLayer.get(
-              key
-            );
+            nextLayer.get(key);
 
 
           if (
             !existing ||
             nextScore <
-              existing.score
+            existing.score
           ) {
             nextLayer.set(
               key,
@@ -705,9 +806,9 @@
   }
 
 
-  // ========================================
-  // 案内文章
-  // ========================================
+  // ==================================================
+  // 方向関連
+  // ==================================================
 
   function getDirectionInfo(
     dx,
@@ -719,13 +820,26 @@
         dy
       );
 
-    const sx =
-      sign(dx);
-
-    const sy =
-      sign(dy);
 
     let mainDirection;
+
+
+    if (
+      mainAxis === "y"
+    ) {
+      mainDirection =
+        dy > 0
+          ? "上"
+          : "下";
+
+    } else {
+      mainDirection =
+        dx > 0
+          ? "右"
+          : "左";
+    }
+
+
     let sideDirection =
       null;
 
@@ -733,19 +847,13 @@
     if (
       mainAxis === "y"
     ) {
-      mainDirection =
-        sy > 0
-          ? "上"
-          : "下";
-
       if (
         dx > 0
       ) {
         sideDirection =
           "右";
-      }
 
-      if (
+      } else if (
         dx < 0
       ) {
         sideDirection =
@@ -753,19 +861,13 @@
       }
 
     } else {
-      mainDirection =
-        sx > 0
-          ? "右"
-          : "左";
-
       if (
         dy > 0
       ) {
         sideDirection =
           "上";
-      }
 
-      if (
+      } else if (
         dy < 0
       ) {
         sideDirection =
@@ -782,9 +884,48 @@
   }
 
 
-  /**
-   * 最初の建設位置についての案内
-   */
+  function getHorizontalDirection(
+    dx
+  ) {
+    if (
+      dx > 0
+    ) {
+      return "右";
+    }
+
+    if (
+      dx < 0
+    ) {
+      return "左";
+    }
+
+    return null;
+  }
+
+
+  function getVerticalDirection(
+    dy
+  ) {
+    if (
+      dy > 0
+    ) {
+      return "上";
+    }
+
+    if (
+      dy < 0
+    ) {
+      return "下";
+    }
+
+    return null;
+  }
+
+
+  // ==================================================
+  // 最初の見張り台の案内
+  // ==================================================
+
   function buildStartInstruction(
     dx,
     dy
@@ -804,15 +945,21 @@
 
 
     if (
-      !sideDirection
+      sideDirection === null
     ) {
       if (
         mainAxis === "y"
       ) {
-        positionText =
+        if (
           mainDirection === "上"
-            ? "真上"
-            : "真下";
+        ) {
+          positionText =
+            "真上";
+
+        } else {
+          positionText =
+            "真下";
+        }
 
       } else {
         positionText =
@@ -835,88 +982,381 @@
   }
 
 
+  // ==================================================
+  // 距離の余裕計算
+  // ==================================================
+
   /**
-   * 最終見張り台が
-   * 目的地のどちら側にあるか
+   * N個の見張り台を使った場合、
+   * 1方向へ到達できる理論上の最大距離。
+   *
+   * 1個目：
+   * 中心はスタートから2マス先まで置ける。
+   *
+   * 2個目以降：
+   * 中心を最大3マスずつ進められる。
+   *
+   * 最後の3×3領地がさらに1マス先まで届く。
+   *
+   * したがって
+   *
+   *   2 + (N - 1) × 3 + 1
+   * = 3N
    */
-  function getApproachSideFromFinalTower(
+  function getMaximumAxisReach(
+    towerCount
+  ) {
+    return (
+      towerCount * 3
+    );
+  }
+
+
+  /**
+   * X・Yそれぞれについて
+   * 理論上あと何マス調整余地があるか。
+   *
+   * 例：
+   * 5個なら最大15マス。
+   *
+   * 下15マス
+   * → 15 - 15 = 0
+   * → ピッタリ
+   *
+   * 右10マス
+   * → 15 - 10 = 5
+   * → 右方向には5マス分の調整余地
+   */
+  function calculateAxisMargins(
+    dx,
+    dy,
+    towerCount
+  ) {
+    const maximumReach =
+      getMaximumAxisReach(
+        towerCount
+      );
+
+
+    return {
+      maximumReach,
+
+      xMargin:
+        maximumReach -
+        Math.abs(dx),
+
+      yMargin:
+        maximumReach -
+        Math.abs(dy),
+    };
+  }
+
+
+  // ==================================================
+  // 最終見張り台と目的地の関係
+  // ==================================================
+
+  function getFinalApproachInfo(
     finalTower,
     targetX,
-    targetY,
-    mainAxis,
-    mainDirection
+    targetY
   ) {
     const dx =
       targetX -
       finalTower.x;
+
 
     const dy =
       targetY -
       finalTower.y;
 
 
+    const absX =
+      Math.abs(dx);
+
+
+    const absY =
+      Math.abs(dy);
+
+
     /**
-     * 左右から辺接触
+     * 目的地が3×3の中
      */
     if (
-      Math.abs(dx) === 2 &&
-      Math.abs(dy) <= 1
+      absX <= 1 &&
+      absY <= 1
     ) {
-      return (
-        dx > 0
-          ? "左"
-          : "右"
-      );
+      return {
+        type:
+          "inside",
+
+        side:
+          null,
+
+        dx,
+        dy,
+      };
     }
 
 
     /**
-     * 上下から辺接触
+     * 目的地が右側
      */
     if (
-      Math.abs(dy) === 2 &&
-      Math.abs(dx) <= 1
+      dx === 2 &&
+      absY <= 1
     ) {
-      return (
-        dy > 0
-          ? "下"
-          : "上"
-      );
+      return {
+        type:
+          "edge",
+
+        side:
+          "左",
+
+        dx,
+        dy,
+      };
     }
 
 
     /**
-     * 目的地が3×3内にある場合
+     * 目的地が左側
      */
     if (
-      mainAxis === "y"
+      dx === -2 &&
+      absY <= 1
     ) {
-      return (
-        mainDirection === "上"
-          ? "下"
-          : "上"
-      );
+      return {
+        type:
+          "edge",
+
+        side:
+          "右",
+
+        dx,
+        dy,
+      };
     }
 
 
-    return (
-      mainDirection === "右"
-        ? "左"
-        : "右"
-    );
+    /**
+     * 目的地が上側
+     */
+    if (
+      dy === 2 &&
+      absX <= 1
+    ) {
+      return {
+        type:
+          "edge",
+
+        side:
+          "下",
+
+        dx,
+        dy,
+      };
+    }
+
+
+    /**
+     * 目的地が下側
+     */
+    if (
+      dy === -2 &&
+      absX <= 1
+    ) {
+      return {
+        type:
+          "edge",
+
+        side:
+          "上",
+
+        dx,
+        dy,
+      };
+    }
+
+
+    return {
+      type:
+        "unknown",
+
+      side:
+        null,
+
+      dx,
+      dy,
+    };
   }
 
 
-  /**
-   * 建設のポイントを作成
-   */
-  function buildGuidance(
+  // ==================================================
+  // 「ピッタリ」案内
+  // ==================================================
+
+  function buildTightAxisNotes(
+    dx,
+    dy,
+    towerCount
+  ) {
+    const {
+      xMargin,
+      yMargin,
+    } =
+      calculateAxisMargins(
+        dx,
+        dy,
+        towerCount
+      );
+
+
+    const notes = [];
+
+
+    const horizontalDirection =
+      getHorizontalDirection(
+        dx
+      );
+
+
+    const verticalDirection =
+      getVerticalDirection(
+        dy
+      );
+
+
+    /**
+     * 横方向がピッタリ
+     */
+    if (
+      horizontalDirection &&
+      xMargin === 0
+    ) {
+      notes.push(
+        `【強調】${horizontalDirection}方向にはピッタリ【/強調】` +
+        `のため、` +
+        `【強調】横方向の建設位置にご注意ください【/強調】。`
+      );
+    }
+
+
+    /**
+     * 縦方向がピッタリ
+     */
+    if (
+      verticalDirection &&
+      yMargin === 0
+    ) {
+      notes.push(
+        `【強調】${verticalDirection}方向にはピッタリ【/強調】` +
+        `のため、` +
+        `【強調】${verticalDirection}方向の建設位置にご注意ください【/強調】。`
+      );
+    }
+
+
+    return notes;
+  }
+
+
+  // ==================================================
+  // ほぼ直線の場合
+  // ==================================================
+
+  function buildStraightRouteNotes(
+    dx,
+    dy
+  ) {
+    const absX =
+      Math.abs(dx);
+
+
+    const absY =
+      Math.abs(dy);
+
+
+    const mainAxis =
+      getMainAxis(
+        dx,
+        dy
+      );
+
+
+    const sideDistance =
+      mainAxis === "y"
+        ? absX
+        : absY;
+
+
+    if (
+      sideDistance > 2
+    ) {
+      return [];
+    }
+
+
+    const notes = [];
+
+
+    if (
+      mainAxis === "y"
+    ) {
+      const direction =
+        dy > 0
+          ? "上"
+          : "下";
+
+
+      const positionText =
+        sideDistance === 0
+          ? `真${direction}`
+          : `概ね真${direction}`;
+
+
+      notes.push(
+        `目的地は` +
+        `【強調】${positionText}【/強調】` +
+        `にあるため、` +
+        `【強調】左右は大きくずらさなければ問題ありません【/強調】。`
+      );
+
+    } else {
+      const positionText =
+        sideDistance === 0
+          ? "真横"
+          : "概ね真横";
+
+
+      notes.push(
+        `目的地は` +
+        `【強調】${positionText}【/強調】` +
+        `のため、` +
+        `【強調】上下は大きくずらさなければ問題ありません【/強調】。`
+      );
+    }
+
+
+    return notes;
+  }
+
+
+  // ==================================================
+  // 斜めルートの案内
+  // ==================================================
+
+  function buildDiagonalRouteNotes(
     dx,
     dy,
     route
   ) {
+    const notes = [];
+
+
     const absX =
       Math.abs(dx);
+
 
     const absY =
       Math.abs(dy);
@@ -939,81 +1379,34 @@
         : absY;
 
 
-    const notes = [
-      buildStartInstruction(
-        dx,
-        dy
-      ),
-    ];
-
-
-    // ----------------------------------------
-    // ほぼ真上・真下・真横
-    // ----------------------------------------
-
-    if (
-      sideDistance <= 2
-    ) {
-      notes.push(
-        `【強調】${mainDirection}方向にはピッタリ【/強調】のため、` +
-        `${mainDirection}方向の` +
-        `【強調】建設位置にご注意ください【/強調】。`
-      );
-
-
-      if (
-        mainAxis === "y"
-      ) {
-        const position =
-          sideDistance === 0
-            ? `真${mainDirection}`
-            : `概ね真${mainDirection}`;
-
-
-        notes.push(
-          `目的地は` +
-          `【強調】${position}【/強調】` +
-          `にあるため、` +
-          `【強調】左右は大きくずらさなければ問題ありません【/強調】。`
-        );
-
-      } else {
-        const position =
-          sideDistance === 0
-            ? "真横"
-            : "概ね真横";
-
-
-        notes.push(
-          `目的地は` +
-          `【強調】${position}【/強調】` +
-          `のため、` +
-          `【強調】上下は大きくずらさなければ問題ありません【/強調】。`
-        );
-      }
-
-
-      return notes;
-    }
-
-
-    // ----------------------------------------
-    // 途中まで斜め、その後ほぼ直進
-    // ----------------------------------------
-
+    /**
+     * 副方向のズレを、
+     * 途中までに吸収できるか。
+     *
+     * 1個目は副方向に最大1マス、
+     * その後は1個につき最大2マス程度
+     * 調整する推奨ルートを想定。
+     */
     const adjustUntil =
       sideDistance <= 1
         ? 1
-        : 1 +
+        : (
+          1 +
           Math.ceil(
             (
               sideDistance -
               1
             ) / 2
-          );
+          )
+        );
 
 
+    /**
+     * 目的地に到着するかなり前に
+     * 副方向の調整が終わる場合。
+     */
     if (
+      sideDirection &&
       adjustUntil <=
       route.length - 2
     ) {
@@ -1055,53 +1448,41 @@
     }
 
 
-    // ----------------------------------------
-    // 最後まで斜め方向を使うケース
-    // ----------------------------------------
-
+    /**
+     * 最後まで斜め方向を使う場合は、
+     * 最終見張り台と目的地の実際の関係を案内。
+     */
     const finalTower =
       route[
         route.length - 1
       ];
 
 
-    const approachSide =
-      getApproachSideFromFinalTower(
+    const approach =
+      getFinalApproachInfo(
         finalTower,
         dx,
-        dy,
-        mainAxis,
-        mainDirection
+        dy
       );
 
 
-    const horizontalDirection =
-      dx > 0
-        ? "右"
-        : dx < 0
-        ? "左"
-        : null;
-
-
-    const verticalDirection =
-      dy > 0
-        ? "上"
-        : dy < 0
-        ? "下"
-        : null;
-
-
     if (
-      horizontalDirection &&
-      verticalDirection
+      approach.type === "edge"
     ) {
       notes.push(
+        `最終の見張り台は、` +
         `目的地の` +
-        `【強調】${approachSide}側に接する【/強調】` +
-        `ように建設することを想定した場合、` +
-        `【強調】${horizontalDirection}方向に2マス、` +
-        `${verticalDirection}方向に2マスの余裕【/強調】` +
-        `があります。`
+        `【強調】${approach.side}側に接する【/強調】` +
+        `位置から到達する想定です。`
+      );
+
+    } else if (
+      approach.type === "inside"
+    ) {
+      notes.push(
+        `最終の見張り台の` +
+        `【強調】3×3の領地内に目的地が入る【/強調】` +
+        `位置で到達する想定です。`
       );
     }
 
@@ -1110,9 +1491,210 @@
   }
 
 
-  // ========================================
+  // ==================================================
+  // 調整余地の案内
+  // ==================================================
+
+  /**
+   * 「固定2マス」は完全廃止。
+   *
+   * 実際の必要個数から
+   * 各軸の最大到達距離を計算する。
+   *
+   * ただし、XとYを同時に最大まで
+   * 使えるとは限らないため、
+   * 「余裕」ではなく
+   * 「調整余地」と表現する。
+   */
+  function buildMarginNote(
+    dx,
+    dy,
+    towerCount
+  ) {
+    const {
+      xMargin,
+      yMargin,
+    } =
+      calculateAxisMargins(
+        dx,
+        dy,
+        towerCount
+      );
+
+
+    const horizontalDirection =
+      getHorizontalDirection(
+        dx
+      );
+
+
+    const verticalDirection =
+      getVerticalDirection(
+        dy
+      );
+
+
+    const parts = [];
+
+
+    if (
+      horizontalDirection &&
+      xMargin > 0
+    ) {
+      parts.push(
+        `${horizontalDirection}方向に${xMargin}マス`
+      );
+    }
+
+
+    if (
+      verticalDirection &&
+      yMargin > 0
+    ) {
+      parts.push(
+        `${verticalDirection}方向に${yMargin}マス`
+      );
+    }
+
+
+    /**
+     * 両方向ピッタリなら
+     * ここでは何も出さない。
+     * ピッタリ案内は別関数で出す。
+     */
+    if (
+      parts.length === 0
+    ) {
+      return null;
+    }
+
+
+    return (
+      `必要な見張り台${towerCount}個で到達できる距離を基準にすると、` +
+      `【強調】${parts.join("、")}分の調整余地【/強調】` +
+      `があります。`
+    );
+  }
+
+
+  // ==================================================
+  // 建設のポイント生成
+  // ==================================================
+
+  function buildGuidance(
+    dx,
+    dy,
+    route
+  ) {
+    const towerCount =
+      route.length;
+
+
+    const notes = [];
+
+
+    /**
+     * ① 最初の建設位置
+     */
+    notes.push(
+      buildStartInstruction(
+        dx,
+        dy
+      )
+    );
+
+
+    /**
+     * ② ピッタリ方向を優先して案内
+     */
+    const tightNotes =
+      buildTightAxisNotes(
+        dx,
+        dy,
+        towerCount
+      );
+
+
+    notes.push(
+      ...tightNotes
+    );
+
+
+    /**
+     * ③ ほぼ直線か斜めか
+     */
+    const absX =
+      Math.abs(dx);
+
+
+    const absY =
+      Math.abs(dy);
+
+
+    const mainAxis =
+      getMainAxis(
+        dx,
+        dy
+      );
+
+
+    const sideDistance =
+      mainAxis === "y"
+        ? absX
+        : absY;
+
+
+    if (
+      sideDistance <= 2
+    ) {
+      notes.push(
+        ...buildStraightRouteNotes(
+          dx,
+          dy
+        )
+      );
+
+    } else {
+      notes.push(
+        ...buildDiagonalRouteNotes(
+          dx,
+          dy,
+          route
+        )
+      );
+    }
+
+
+    /**
+     * ④ 数字としての調整余地
+     *
+     * 固定2マスではなく
+     * 実際の必要個数から計算。
+     */
+    const marginNote =
+      buildMarginNote(
+        dx,
+        dy,
+        towerCount
+      );
+
+
+    if (
+      marginNote
+    ) {
+      notes.push(
+        marginNote
+      );
+    }
+
+
+    return notes;
+  }
+
+
+  // ==================================================
   // メイン計算
-  // ========================================
+  // ==================================================
 
   function calculateWatchtowers(
     startX,
@@ -1144,9 +1726,10 @@
       start.cellY;
 
 
-    /**
-     * すでに接している場合
-     */
+    // --------------------------------------------------
+    // すでに接している場合
+    // --------------------------------------------------
+
     if (
       isAlreadyConnected(
         dx,
@@ -1178,9 +1761,10 @@
     }
 
 
-    /**
-     * 最短ルート計算
-     */
+    // --------------------------------------------------
+    // 最短ルート
+    // --------------------------------------------------
+
     const shortest =
       findShortestRoute(
         dx,
@@ -1188,10 +1772,10 @@
       );
 
 
-    /**
-     * 推奨建築座標を
-     * 実際のゲーム座標へ変換
-     */
+    // --------------------------------------------------
+    // 推奨建築座標
+    // --------------------------------------------------
+
     const routeCoordinates =
       shortest.route.map(
         (
@@ -1234,9 +1818,10 @@
       );
 
 
-    /**
-     * 建設ポイント文章生成
-     */
+    // --------------------------------------------------
+    // 建設ポイント
+    // --------------------------------------------------
+
     const guidance =
       buildGuidance(
         dx,
@@ -1268,9 +1853,9 @@
   }
 
 
-  // ========================================
+  // ==================================================
   // HTML側へ公開
-  // ========================================
+  // ==================================================
 
   window.WatchtowerCalculator = {
     calculate:
